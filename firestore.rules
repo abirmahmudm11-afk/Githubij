@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isTimestampOrNull(val) {
+      return val == null || val is timestamp;
+    }
+
+    function isValidUser(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.email is string &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('photoUrl' in data) || data.photoUrl is string) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt));
+    }
+
+    function isValidChat(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             (!('model' in data) || data.model is string) &&
+             (!('pinned' in data) || data.pinned is bool) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt)) &&
+             (!('updatedAt' in data) || isTimestampOrNull(data.updatedAt));
+    }
+
+    function isValidChatMessage(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.role in ['user', 'assistant'] &&
+             data.content is string && data.content.size() <= 100000 &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt));
+    }
+
+    function isValidWorkspace(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.language is string &&
+             (!('description' in data) || data.description is string) &&
+             (!('status' in data) || data.status is string) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt)) &&
+             (!('updatedAt' in data) || isTimestampOrNull(data.updatedAt));
+    }
+
+    function isValidWorkspaceFile(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.path is string && data.path.size() > 0 &&
+             data.name is string && data.name.size() > 0 &&
+             data.content is string &&
+             (!('language' in data) || data.language is string) &&
+             (!('size' in data) || data.size is number) &&
+             (!('updatedAt' in data) || isTimestampOrNull(data.updatedAt));
+    }
+
+    function isValidLibraryItem(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.content is string &&
+             data.type in ['prompt', 'snippet', 'persona', 'template'] &&
+             (!('tags' in data) || data.tags is list) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt)) &&
+             (!('updatedAt' in data) || isTimestampOrNull(data.updatedAt));
+    }
+
+    function isValidProject(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+             (!('description' in data) || data.description is string) &&
+             (!('status' in data) || data.status is string) &&
+             (!('repoUrl' in data) || data.repoUrl is string) &&
+             (!('environment' in data) || data.environment is string) &&
+             (!('branch' in data) || data.branch is string) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt)) &&
+             (!('updatedAt' in data) || isTimestampOrNull(data.updatedAt));
+    }
+
+    function isValidImageArtifact(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.prompt is string && data.prompt.size() > 0 && data.prompt.size() <= 2000 &&
+             (!('style' in data) || data.style is string) &&
+             (!('aspectRatio' in data) || data.aspectRatio is string) &&
+             (!('status' in data) || data.status is string) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt));
+    }
+
+    function isValidRemoteJob(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.command is string && data.command.size() > 0 &&
+             data.status is string &&
+             (!('name' in data) || data.name is string) &&
+             (!('host' in data) || data.host is string) &&
+             (!('outputLog' in data) || data.outputLog is string) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt));
+    }
+
+    function isValidScheduledTask(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 &&
+             data.cronExpression is string &&
+             (!('targetModule' in data) || data.targetModule is string) &&
+             (!('active' in data) || data.active is bool) &&
+             (!('lastRun' in data) || data.lastRun is string) &&
+             (!('createdAt' in data) || isTimestampOrNull(data.createdAt));
+    }
+
+    function isValidAdminMetric(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             (!('tokenUsage' in data) || data.tokenUsage is number) &&
+             (!('requestCount' in data) || data.requestCount is number) &&
+             (!('averageLatencyMs' in data) || data.averageLatencyMs is number) &&
+             (!('activeSessions' in data) || data.activeSessions is number) &&
+             (!('updatedAt' in data) || isTimestampOrNull(data.updatedAt));
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow delete: if isOwner(userId);
+
+      match /chats/{chatId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidChat(request.resource.data);
+        allow delete: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidChatMessage(request.resource.data);
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /workspaces/{workspaceId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidWorkspace(request.resource.data);
+        allow delete: if isOwner(userId);
+
+        match /files/{fileId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidWorkspaceFile(request.resource.data);
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /library/{itemId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidLibraryItem(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /projects/{projectId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidProject(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /images/{imageId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidImageArtifact(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /remote_jobs/{jobId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidRemoteJob(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /schedules/{scheduleId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidScheduledTask(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /admin_metrics/{metricId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidAdminMetric(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

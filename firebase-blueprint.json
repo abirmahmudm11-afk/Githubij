@@ -1,0 +1,209 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Conversational chat session in CLOUKE AI",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "model": { "type": "string" },
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual message inside a chat thread",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "role", "content"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Coltef developer workspace project",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "language": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "language"]
+    },
+    "WorkspaceFile": {
+      "title": "WorkspaceFile",
+      "description": "Source file within a Coltef workspace",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "path": { "type": "string" },
+        "name": { "type": "string" },
+        "content": { "type": "string" },
+        "language": { "type": "string" },
+        "size": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "path", "name", "content"]
+    },
+    "LibraryItem": {
+      "title": "LibraryItem",
+      "description": "Saved prompt, code snippet, persona, or template",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["prompt", "snippet", "persona", "template"] },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "content", "type"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Project tracked in the Projects destination",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "repoUrl": { "type": "string" },
+        "environment": { "type": "string" },
+        "branch": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name"]
+    },
+    "ImageArtifact": {
+      "title": "ImageArtifact",
+      "description": "Generated or saved image record in Images destination",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "style": { "type": "string" },
+        "aspectRatio": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "prompt"]
+    },
+    "RemoteJob": {
+      "title": "RemoteJob",
+      "description": "Remote execution runner task or job",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "command": { "type": "string" },
+        "host": { "type": "string" },
+        "status": { "type": "string" },
+        "outputLog": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "command", "status"]
+    },
+    "ScheduledTask": {
+      "title": "ScheduledTask",
+      "description": "Automated schedule or recurring task",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "cronExpression": { "type": "string" },
+        "targetModule": { "type": "string" },
+        "active": { "type": "boolean" },
+        "lastRun": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "cronExpression"]
+    },
+    "AdminMetric": {
+      "title": "AdminMetric",
+      "description": "System resource and token consumption metrics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "tokenUsage": { "type": "number" },
+        "requestCount": { "type": "number" },
+        "averageLatencyMs": { "type": "number" },
+        "activeSessions": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile settings"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "User conversational chats"
+    },
+    "/users/{userId}/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Messages inside a user chat"
+    },
+    "/users/{userId}/workspaces/{workspaceId}": {
+      "schema": "Workspace",
+      "description": "Coltef developer workspace"
+    },
+    "/users/{userId}/workspaces/{workspaceId}/files/{fileId}": {
+      "schema": "WorkspaceFile",
+      "description": "Files inside a Coltef workspace"
+    },
+    "/users/{userId}/library/{itemId}": {
+      "schema": "LibraryItem",
+      "description": "User saved library prompts and snippets"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User tracked software projects"
+    },
+    "/users/{userId}/images/{imageId}": {
+      "schema": "ImageArtifact",
+      "description": "User generated image artifacts"
+    },
+    "/users/{userId}/remote_jobs/{jobId}": {
+      "schema": "RemoteJob",
+      "description": "User remote execution runner jobs"
+    },
+    "/users/{userId}/schedules/{scheduleId}": {
+      "schema": "ScheduledTask",
+      "description": "User recurring scheduled tasks"
+    },
+    "/users/{userId}/admin_metrics/{metricId}": {
+      "schema": "AdminMetric",
+      "description": "User usage telemetry and token logs"
+    }
+  }
+}
