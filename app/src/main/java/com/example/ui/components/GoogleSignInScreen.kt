@@ -70,7 +70,7 @@ fun GoogleSignInScreen(
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
                         contentDescription = "CLOUKE Logo",
-                        tint = CloukeEmerald,
+                        tint = Color.White,
                         modifier = Modifier.size(44.dp)
                     )
                 }
@@ -109,13 +109,13 @@ fun GoogleSignInScreen(
                         title = "CLOUKE AI Assistant",
                         subtitle = "Fast streaming, multi-turn reasoning powered by Gemini 3.8"
                     )
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                     FeaturePillarRow(
                         icon = Icons.Default.Code,
                         title = "Coltef Developer Workspace",
                         subtitle = "Multi-file editor, virtual terminal, code diffs & run simulator"
                     )
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                     FeaturePillarRow(
                         icon = Icons.Default.Sync,
                         title = "Cloud Firestore Persistence",

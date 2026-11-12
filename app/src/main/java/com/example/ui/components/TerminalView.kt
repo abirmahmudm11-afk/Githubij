@@ -151,7 +151,7 @@ fun TerminalView(
             }
         }
 
-        Divider(color = Color(0xFF1F2937), thickness = 0.5.dp)
+        HorizontalDivider(color = Color(0xFF1F2937), thickness = 0.5.dp)
 
         // Terminal Log Area
         LazyColumn(

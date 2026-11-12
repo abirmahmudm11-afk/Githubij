@@ -19,6 +19,16 @@ class FirestoreRepositoryRuleTest : FirestoreEmulatorTestBase() {
         }
         assertNotNull(chatId)
         assertTrue(chatId.isNotEmpty())
+
+        // Test pin chat
+        withTimeout(10000L) {
+            repository.pinChat(chatId, true)
+        }
+
+        // Test rename chat
+        withTimeout(10000L) {
+            repository.renameChat(chatId, "Renamed Architecture Session")
+        }
     }
 
     @Test

@@ -7,7 +7,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,9 +36,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // MANDATORY: App Check wiring before rendering UI or calling Firebase
         configureAppCheck(this, intent)
-
         enableEdgeToEdge()
 
         val authManager = AuthManager(this)
@@ -48,11 +49,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppContent(authManager: AuthManager) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var currentUser by remember { mutableStateOf(Firebase.auth.currentUser) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { auth ->
@@ -68,7 +71,7 @@ fun AppContent(authManager: AuthManager) {
         authManager.attemptAutoSignIn(
             scope = scope,
             onAuthSuccess = { currentUser = Firebase.auth.currentUser },
-            onUnauthenticated = { /* show sign in screen */ }
+            onUnauthenticated = { /* stay on sign-in screen */ }
         )
     }
 
@@ -89,7 +92,6 @@ fun AppContent(authManager: AuthManager) {
                 factory = MainViewModelFactory(firestoreRepo, aiRepo)
             )
 
-            // Sync user profile on login
             LaunchedEffect(uid) {
                 firestoreRepo.syncUserProfile(
                     displayName = currentUser!!.displayName ?: "CLOUKE Developer",
@@ -99,8 +101,10 @@ fun AppContent(authManager: AuthManager) {
             }
 
             val currentDestination by viewModel.currentDestination.collectAsStateWithLifecycle()
+            val chats by viewModel.chats.collectAsStateWithLifecycle()
+            val activeChatId by viewModel.activeChatId.collectAsStateWithLifecycle()
+            val chatSearchQuery by viewModel.chatSearchQuery.collectAsStateWithLifecycle()
 
-            // Handle back navigation for secondary screens
             if (currentDestination != AppDestination.CHAT) {
                 BackHandler {
                     viewModel.navigateTo(AppDestination.CHAT)
@@ -110,12 +114,23 @@ fun AppContent(authManager: AuthManager) {
             NavigationShell(
                 currentDestination = currentDestination,
                 onNavigate = { dest -> viewModel.navigateTo(dest) },
+                chats = chats,
+                activeChatId = activeChatId,
+                searchQuery = chatSearchQuery,
+                onSearchQueryChange = { query -> viewModel.setSearchQuery(query) },
+                onSelectChat = { id -> viewModel.selectChat(id) },
+                onNewChat = { viewModel.startNewChat() },
+                onPinChat = { id, pinned -> viewModel.pinChat(id, pinned) },
+                onRenameChat = { id, title -> viewModel.renameChat(id, title) },
+                onDeleteChat = { id -> viewModel.deleteChat(id) },
                 userEmail = userEmail,
                 onSignOut = {
                     authManager.signOut(scope) {
                         currentUser = null
                     }
-                }
+                },
+                drawerState = drawerState,
+                scope = scope
             ) { innerPadding ->
                 Surface(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                     when (currentDestination) {
@@ -124,15 +139,29 @@ fun AppContent(authManager: AuthManager) {
                             val messages by viewModel.messages.collectAsStateWithLifecycle()
                             val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
                             val streamingText by viewModel.streamingText.collectAsStateWithLifecycle()
+                            val selectedModel by viewModel.selectedModel.collectAsStateWithLifecycle()
+                            val pendingAttachment by viewModel.pendingAttachment.collectAsStateWithLifecycle()
+                            val isVoiceActive by viewModel.isVoiceActive.collectAsStateWithLifecycle()
 
                             MainChatScreen(
                                 currentChat = currentChat,
                                 messages = messages,
                                 isGenerating = isGenerating,
                                 streamingText = streamingText,
+                                selectedModel = selectedModel,
+                                availableModels = viewModel.availableModels,
+                                pendingAttachment = pendingAttachment,
+                                isVoiceActive = isVoiceActive,
+                                onSelectModel = { model -> viewModel.selectModel(model) },
                                 onSendMessage = { text -> viewModel.sendChatMessage(text) },
+                                onStopGeneration = { viewModel.stopGeneration() },
+                                onRegenerate = { viewModel.regenerateLastResponse() },
                                 onNewChat = { viewModel.startNewChat() },
-                                onSendCodeToColtef = { lang, code -> viewModel.sendCodeFromChatToColtef(lang, code) }
+                                onAttachFile = { name, summary -> viewModel.attachFile(name, summary) },
+                                onClearAttachment = { viewModel.clearAttachment() },
+                                onToggleVoice = { viewModel.toggleVoiceListening() },
+                                onSendCodeToColtef = { lang, code -> viewModel.sendCodeFromChatToColtef(lang, code) },
+                                onOpenDrawer = { scope.launch { drawerState.open() } }
                             )
                         }
 

@@ -1,15 +1,16 @@
 package com.example.ui.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.*
+import com.example.data.repository.AiModelTier
 import com.example.data.repository.AiRepository
 import com.example.data.repository.FirestoreRepository
 import com.example.ui.components.TerminalLine
 import com.example.ui.components.TerminalLineType
 import com.example.ui.navigation.AppDestination
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -18,7 +19,7 @@ class MainViewModel(
     private val aiRepo: AiRepository
 ) : ViewModel() {
 
-    // Navigation State
+    // --- Navigation State ---
     private val _currentDestination = MutableStateFlow(AppDestination.CHAT)
     val currentDestination: StateFlow<AppDestination> = _currentDestination.asStateFlow()
 
@@ -26,15 +27,38 @@ class MainViewModel(
         _currentDestination.value = destination
     }
 
+    // --- Model Selection State ---
+    val availableModels: List<AiModelTier> = AiRepository.SUPPORTED_MODELS
+    private val _selectedModel = MutableStateFlow(availableModels.first())
+    val selectedModel: StateFlow<AiModelTier> = _selectedModel.asStateFlow()
+
+    fun selectModel(model: AiModelTier) {
+        _selectedModel.value = model
+    }
+
     // --- Chat State ---
-    val chats: StateFlow<List<ChatSession>> = firestoreRepo.observeChats()
+    val rawChats: StateFlow<List<ChatSession>> = firestoreRepo.observeChats()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _chatSearchQuery = MutableStateFlow("")
+    val chatSearchQuery: StateFlow<String> = _chatSearchQuery.asStateFlow()
+
+    fun setSearchQuery(query: String) {
+        _chatSearchQuery.value = query
+    }
+
+    val chats: StateFlow<List<ChatSession>> = combine(rawChats, _chatSearchQuery) { list, query ->
+        val trimmed = query.trim().lowercase()
+        val filtered = if (trimmed.isEmpty()) list else list.filter { it.title.lowercase().contains(trimmed) }
+        // Sort: Pinned first, then by updatedAt/createdAt descending
+        filtered.sortedWith(compareByDescending<ChatSession> { it.pinned }.thenByDescending { it.updatedAt ?: it.createdAt })
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _activeChatId = MutableStateFlow<String?>(null)
     val activeChatId: StateFlow<String?> = _activeChatId.asStateFlow()
 
-    val currentChat: StateFlow<ChatSession?> = combine(chats, _activeChatId) { list, id ->
-        list.firstOrNull { it.id == id } ?: list.firstOrNull()
+    val currentChat: StateFlow<ChatSession?> = combine(rawChats, _activeChatId) { list, id ->
+        list.firstOrNull { it.id == id }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -49,10 +73,31 @@ class MainViewModel(
     private val _streamingText = MutableStateFlow("")
     val streamingText: StateFlow<String> = _streamingText.asStateFlow()
 
+    private var generateJob: Job? = null
+
+    // --- Attachments & Voice State ---
+    private val _pendingAttachment = MutableStateFlow<String?>(null)
+    val pendingAttachment: StateFlow<String?> = _pendingAttachment.asStateFlow()
+
+    private val _isVoiceActive = MutableStateFlow(false)
+    val isVoiceActive: StateFlow<Boolean> = _isVoiceActive.asStateFlow()
+
+    fun attachFile(name: String, summary: String) {
+        _pendingAttachment.value = "$name ($summary)"
+    }
+
+    fun clearAttachment() {
+        _pendingAttachment.value = null
+    }
+
+    fun toggleVoiceListening() {
+        _isVoiceActive.value = !_isVoiceActive.value
+    }
+
     init {
-        // Automatically select first chat if available
+        // Automatically select the most recent or pinned chat if available
         viewModelScope.launch {
-            chats.collect { list ->
+            rawChats.collect { list ->
                 if (_activeChatId.value == null && list.isNotEmpty()) {
                     _activeChatId.value = list.first().id
                 }
@@ -60,23 +105,72 @@ class MainViewModel(
         }
     }
 
-    fun startNewChat(title: String = "New Architecture Discussion") {
+    fun startNewChat(title: String? = null) {
         viewModelScope.launch {
-            val newId = firestoreRepo.createChat(title)
+            stopGeneration()
+            val newTitle = title ?: "New Conversation"
+            val newId = firestoreRepo.createChat(newTitle, _selectedModel.value.id)
             _activeChatId.value = newId
             _currentDestination.value = AppDestination.CHAT
         }
     }
 
     fun selectChat(chatId: String) {
-        _activeChatId.value = chatId
+        if (_activeChatId.value != chatId) {
+            stopGeneration()
+            _activeChatId.value = chatId
+        }
+        _currentDestination.value = AppDestination.CHAT
+    }
+
+    fun pinChat(chatId: String, pinned: Boolean) {
+        viewModelScope.launch {
+            firestoreRepo.pinChat(chatId, pinned)
+        }
+    }
+
+    fun renameChat(chatId: String, newTitle: String) {
+        val trimmed = newTitle.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            firestoreRepo.renameChat(chatId, trimmed)
+        }
+    }
+
+    fun deleteChat(chatId: String) {
+        viewModelScope.launch {
+            if (_activeChatId.value == chatId) {
+                stopGeneration()
+                _activeChatId.value = null
+            }
+            firestoreRepo.deleteChat(chatId)
+        }
     }
 
     fun sendChatMessage(prompt: String) {
-        val chatId = _activeChatId.value ?: return
+        val trimmed = prompt.trim()
+        val attachment = _pendingAttachment.value
+        if (trimmed.isEmpty() && attachment.isNullOrEmpty()) return
+        if (_isGenerating.value) return // Prevent duplicate sends
+
+        val fullPrompt = if (!attachment.isNullOrEmpty()) {
+            if (trimmed.isNotEmpty()) "$trimmed\n\n[Attachment: $attachment]" else "[Attachment: $attachment]"
+        } else {
+            trimmed
+        }
+        _pendingAttachment.value = null
+
         viewModelScope.launch {
+            var chatId = _activeChatId.value
+            if (chatId == null) {
+                // Fix first-message creation: auto-create chat with meaningful title
+                val autoTitle = if (trimmed.length > 40) trimmed.take(40) + "..." else trimmed.ifBlank { "Architecture Discussion" }
+                chatId = firestoreRepo.createChat(autoTitle, _selectedModel.value.id)
+                _activeChatId.value = chatId
+            }
+
             // Save user message to Firestore
-            firestoreRepo.addMessage(chatId, "user", prompt)
+            firestoreRepo.addMessage(chatId, "user", fullPrompt)
             firestoreRepo.updateAdminMetrics(tokensUsedDelta = 45.0)
 
             _isGenerating.value = true
@@ -84,20 +178,54 @@ class MainViewModel(
 
             val history = messages.value.map { it.role to it.content }
             val accumulated = StringBuilder()
+            val activeModelId = _selectedModel.value.id
 
-            aiRepo.generateStream(prompt, history).collect { chunk ->
-                accumulated.append(chunk)
-                _streamingText.value = accumulated.toString()
+            generateJob = launch {
+                try {
+                    aiRepo.generateStream(fullPrompt, history, activeModelId).collect { chunk ->
+                        accumulated.append(chunk)
+                        _streamingText.value = accumulated.toString()
+                    }
+
+                    val finalText = accumulated.toString().ifBlank {
+                        "I've processed your request. Let me know how else I can assist."
+                    }
+                    firestoreRepo.addMessage(chatId, "assistant", finalText)
+                    firestoreRepo.updateAdminMetrics(tokensUsedDelta = 120.0)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // Stopped by user
+                } catch (e: Exception) {
+                    val errorMsg = "Response interrupted: ${e.localizedMessage ?: "Network error"}"
+                    firestoreRepo.addMessage(chatId, "assistant", errorMsg)
+                } finally {
+                    _streamingText.value = ""
+                    _isGenerating.value = false
+                    generateJob = null
+                }
             }
-
-            // Save assistant final response to Firestore
-            val finalText = accumulated.toString().ifBlank { "I've processed your request. Let me know how else I can assist." }
-            firestoreRepo.addMessage(chatId, "assistant", finalText)
-            firestoreRepo.updateAdminMetrics(tokensUsedDelta = 120.0)
-
-            _streamingText.value = ""
-            _isGenerating.value = false
         }
+    }
+
+    fun stopGeneration() {
+        if (_isGenerating.value) {
+            val partial = _streamingText.value
+            generateJob?.cancel()
+            generateJob = null
+            _isGenerating.value = false
+
+            val chatId = _activeChatId.value
+            if (chatId != null && partial.isNotBlank()) {
+                viewModelScope.launch {
+                    firestoreRepo.addMessage(chatId, "assistant", "$partial\n\n[Generation stopped by user]")
+                }
+            }
+            _streamingText.value = ""
+        }
+    }
+
+    fun regenerateLastResponse() {
+        val lastUserMsg = messages.value.lastOrNull { it.role == "user" } ?: return
+        sendChatMessage(lastUserMsg.content)
     }
 
     // --- Coltef Workspace State ---
@@ -123,7 +251,6 @@ class MainViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
-        // Automatically select first workspace and first file
         viewModelScope.launch {
             workspaces.collect { wsList ->
                 if (_activeWorkspaceId.value == null && wsList.isNotEmpty()) {
@@ -318,7 +445,6 @@ class MainViewModel(
             appendTerminalLine(TerminalLineType.SUCCESS, "Codex Agent generated update.")
             appendTerminalLine(TerminalLineType.OUTPUT, result.take(200) + if (result.length > 200) "..." else "")
 
-            // Update active file with Codex output if it returned code
             if (result.contains("fun ") || result.contains("class ") || result.contains("def ")) {
                 val cleanCode = result.replace("```[a-zA-Z]*".toRegex(), "").replace("```", "").trim()
                 activeFile.value?.let { file ->

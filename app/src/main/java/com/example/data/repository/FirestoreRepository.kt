@@ -113,6 +113,32 @@ class FirestoreRepository(private val db: FirebaseFirestore) {
         }
     }
 
+    suspend fun pinChat(chatId: String, pinned: Boolean) {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid).collection("chats").document(chatId)
+        try {
+            docRef.update("pinned", pinned, "updatedAt", FieldValue.serverTimestamp()).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            throw e
+        }
+    }
+
+    suspend fun renameChat(chatId: String, newTitle: String) {
+        val uid = requireUserId()
+        val docRef = db.collection("users").document(uid).collection("chats").document(chatId)
+        try {
+            docRef.update("title", newTitle, "updatedAt", FieldValue.serverTimestamp()).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            throw e
+        }
+    }
+
     // --- Messages ---
     fun observeMessages(chatId: String): Flow<List<ChatMessage>> = flow {
         val uid = requireUserId()

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -183,11 +184,11 @@ fun ColtefScreen(
                         onClick = { showCreateFileDialog = true },
                         modifier = Modifier.size(22.dp).testTag("new_file_btn")
                     ) {
-                        Icon(imageVector = Icons.Default.NoteAdd, contentDescription = "Add file", modifier = Modifier.size(14.dp))
+                        Icon(imageVector = Icons.AutoMirrored.Filled.NoteAdd, contentDescription = "Add file", modifier = Modifier.size(14.dp))
                     }
                 }
 
-                Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(files) { file ->

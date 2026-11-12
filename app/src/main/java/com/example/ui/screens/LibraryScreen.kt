@@ -98,7 +98,7 @@ fun LibraryScreen(
                 }
             }
 
-            Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
 
             if (filteredItems.isEmpty()) {
                 Box(

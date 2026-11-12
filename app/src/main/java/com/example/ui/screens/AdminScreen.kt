@@ -131,11 +131,11 @@ fun AdminScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SecurityRow(label = "Firebase App Check", value = "Attestation Valid (Debug Provider)", isGood = true)
-                Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
                 SecurityRow(label = "Firestore Security Rules", value = "Enforcing 8 Pillars Zero-Trust", isGood = true)
-                Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
                 SecurityRow(label = "Auth Provider", value = "Credential Manager Google Sign-In", isGood = true)
-                Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
                 SecurityRow(label = "Coltef Virtual Sandbox", value = "Memory Isolated Process", isGood = true)
             }
         }
